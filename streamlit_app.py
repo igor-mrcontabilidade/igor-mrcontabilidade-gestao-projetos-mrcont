@@ -410,7 +410,7 @@ if not dfv.empty:
     if f_status == "⚠️ ATRASADAS":
         dfv = dfv[
             (dfv["status_micro"] != "CONCLUÍDO") &
-            dfv["prazo_micro"].apply(lambda x: not pd.isna(x) and x.date() < today)
+            dfv["prazo_micro"].apply(lambda x: not pd.isna(x) and hasattr(x, 'date') and x.date() < today)
         ]
     elif f_status != "Todos":
         dfv = dfv[dfv["status_micro"] == f_status]
@@ -420,7 +420,7 @@ total      = len(dfv)
 concluidos = int((dfv["status_micro"] == "CONCLUÍDO").sum()) if not dfv.empty else 0
 andamento  = int((dfv["status_micro"] == "EM ANDAMENTO").sum()) if not dfv.empty else 0
 atrasados  = int(dfv[dfv["status_micro"] != "CONCLUÍDO"]["prazo_micro"]
-                 .apply(lambda x: not pd.isna(x) and x.date() < today).sum()) if not dfv.empty else 0
+                 .apply(lambda x: not pd.isna(x) and hasattr(x, 'date') and x.date() < today).sum()) if not dfv.empty else 0
 
 cols = st.columns(5)
 for col, val, lbl, cor in [
@@ -572,7 +572,7 @@ with tab_graf:
             conc   = int((dp["status_micro"] == "CONCLUÍDO").sum())
             and_p  = int((dp["status_micro"] == "EM ANDAMENTO").sum())
             atr_p  = int(dp[dp["status_micro"] != "CONCLUÍDO"]["prazo_micro"]
-                         .apply(lambda x: not pd.isna(x) and x.date() < today).sum())
+                         .apply(lambda x: not pd.isna(x) and hasattr(x, 'date') and x.date() < today).sum())
             pe     = dp["prazo_entrega"].iloc[0]
             proj_stats.append({
                 "Projeto": proj, "Cliente": dp["cliente"].iloc[0],
