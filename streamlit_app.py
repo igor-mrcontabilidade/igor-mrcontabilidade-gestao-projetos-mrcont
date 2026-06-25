@@ -174,46 +174,50 @@ def logo_html(width: int = 180) -> str:
             f'style="width:{width}px;display:block;margin:0 auto" />')
 
 def login_page():
+    # Centraliza verticalmente
+    st.markdown("""
+    <style>
+    .login-wrap {max-width:400px;margin:60px auto 0;}
+    .login-btn button {
+        background-color:#1A6B7C !important;
+        color:#FFF !important;
+        border:none !important;
+        font-family:Arial,sans-serif !important;
+        font-size:14px !important;
+        font-weight:700 !important;
+        border-radius:8px !important;
+        width:100% !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.markdown(
-        f'<div style="max-width:420px;margin:48px auto 0;text-align:center">'
-        f'{logo_html(200)}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<div style="background:{C_NAVY};padding:18px 32px 16px;border-radius:12px;'
-        f'max-width:420px;margin:18px auto 24px;text-align:center">'
-        f'<p style="font-family:Georgia,serif;font-size:20px;font-weight:400;color:#FFF;margin:0 0 2px 0">Gestão de Projetos</p>'
+        f'<div class="login-wrap">'
+        f'<div style="text-align:center;margin-bottom:24px">{logo_html(220)}</div>'
+        f'<div style="background:{C_NAVY};padding:16px 28px;border-radius:10px;text-align:center;margin-bottom:24px">'
+        f'<p style="font-family:Georgia,serif;font-size:22px;font-weight:400;color:#FFF;margin:0 0 4px 0">Gestão de Projetos</p>'
         f'<p style="font-family:Arial,sans-serif;font-size:10px;color:#94A3B8;letter-spacing:2.5px;text-transform:uppercase;margin:0">MR Cont · Martins Romero</p>'
+        f'</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
 
     col = st.columns([1, 2, 1])[1]
     with col:
-        st.markdown(
-            f'<div style="background:{C_WHITE};border:1px solid {C_BORDER};border-radius:12px;padding:28px 28px 24px">',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<p style="font-family:Georgia,serif;font-size:16px;color:{C_TITLE};margin:0 0 20px 0">Acesso ao Sistema</p>',
-            unsafe_allow_html=True,
-        )
         with st.form("login_form"):
-            username = st.text_input("Usuário", placeholder="seu.usuario")
-            password = st.text_input("Senha",   placeholder="••••••••", type="password")
-            submitted = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+            username  = st.text_input("Usuário", placeholder="seu.usuario")
+            password  = st.text_input("Senha",   placeholder="••••••••", type="password")
+            submitted = st.form_submit_button("Entrar", use_container_width=True)
 
         if submitted:
             user = get_user(username)
             if user and check_pw(password, user["password_hash"]):
-                st.session_state.usuario     = user["username"]
+                st.session_state.usuario      = user["username"]
                 st.session_state.usuario_nome = user["nome"]
-                st.session_state.role        = user["role"]
+                st.session_state.role         = user["role"]
                 st.rerun()
             else:
                 st.error("Usuário ou senha incorretos.")
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # Verificar sessão
@@ -408,10 +412,8 @@ if not dfv.empty:
     if f_resp != "Todos":
         dfv = dfv[dfv["responsavel"] == f_resp]
     if f_status == "⚠️ ATRASADAS":
-        dfv = dfv[
-            (dfv["status_micro"] != "CONCLUÍDO") &
-            dfv["prazo_micro"].apply(lambda x: not pd.isna(x) and hasattr(x, 'date') and x.date() < today)
-        ]
+        prazo_dt = pd.to_datetime(dfv["prazo_micro"], errors="coerce")
+        dfv = dfv[(dfv["status_micro"] != "CONCLUÍDO") & (prazo_dt < pd.Timestamp(today))]
     elif f_status != "Todos":
         dfv = dfv[dfv["status_micro"] == f_status]
 
@@ -419,8 +421,11 @@ if not dfv.empty:
 total      = len(dfv)
 concluidos = int((dfv["status_micro"] == "CONCLUÍDO").sum()) if not dfv.empty else 0
 andamento  = int((dfv["status_micro"] == "EM ANDAMENTO").sum()) if not dfv.empty else 0
-atrasados  = int(dfv[dfv["status_micro"] != "CONCLUÍDO"]["prazo_micro"]
-                 .apply(lambda x: not pd.isna(x) and hasattr(x, 'date') and x.date() < today).sum()) if not dfv.empty else 0
+if not dfv.empty:
+    _prazo_dt = pd.to_datetime(dfv[dfv["status_micro"] != "CONCLUÍDO"]["prazo_micro"], errors="coerce")
+    atrasados = int((_prazo_dt < pd.Timestamp(today)).sum())
+else:
+    atrasados = 0
 
 cols = st.columns(5)
 for col, val, lbl, cor in [
@@ -571,8 +576,9 @@ with tab_graf:
             tp     = len(dp)
             conc   = int((dp["status_micro"] == "CONCLUÍDO").sum())
             and_p  = int((dp["status_micro"] == "EM ANDAMENTO").sum())
-            atr_p  = int(dp[dp["status_micro"] != "CONCLUÍDO"]["prazo_micro"]
-                         .apply(lambda x: not pd.isna(x) and hasattr(x, 'date') and x.date() < today).sum())
+            dp_inc = dp[dp["status_micro"] != "CONCLUÍDO"]
+            prazo_dt = pd.to_datetime(dp_inc["prazo_micro"], errors="coerce")
+            atr_p  = int((prazo_dt < pd.Timestamp(today)).sum())
             pe     = dp["prazo_entrega"].iloc[0]
             proj_stats.append({
                 "Projeto": proj, "Cliente": dp["cliente"].iloc[0],
