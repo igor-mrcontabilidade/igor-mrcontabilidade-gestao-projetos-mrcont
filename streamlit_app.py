@@ -43,7 +43,8 @@ C_WHITE  = "#FFFFFF"   # branco puro (badges/texto em fundos escuros)
 
 STATUS_MICRO_OPTS = ["A INICIAR", "EM ANDAMENTO", "CONCLUÍDO", "PAUSADO", "CANCELADO"]
 STATUS_MACRO_OPTS = ["A INICIAR", "EM ANDAMENTO", "CONCLUÍDO", "PAUSADO", "CANCELADO"]
-RESPONSAVEIS      = ["MARCOS", "IGOR", "MARIANA", "EQUIPE", "MARCOS/IGOR"]
+RESPONSAVEIS      = ["IGOR", "MARCOS", "MAIKON", "DEBORA", "JOÃO", "MARIANA", "ELIANA"]
+AREAS             = ["Contábil", "Fiscal", "DP", "Controladoria", "Financeiro", "Tecnologia"]
 
 STATUS_COLOR = {
     "A INICIAR":    "#6B87A8",
@@ -274,7 +275,7 @@ def load_data() -> pd.DataFrame:
     if not r.data:
         return pd.DataFrame(columns=[
             "id","cliente","projeto_macro","micro_etapa",
-            "prazo_micro","responsavel","status_micro","prazo_entrega","status_macro"
+            "prazo_micro","responsavel","status_micro","prazo_entrega","status_macro","area"
         ])
     df = pd.DataFrame(r.data)
     df["prazo_micro"]   = pd.to_datetime(df["prazo_micro"],   errors="coerce")
@@ -306,6 +307,7 @@ def upsert_dataframe(df_edited: pd.DataFrame):
             "status_micro":  r["status_micro"],
             "prazo_entrega": r["prazo_entrega"].strftime("%Y-%m-%d") if pd.notna(r["prazo_entrega"]) else None,
             "status_macro":  r["status_macro"],
+            "area":          r.get("area") if isinstance(r, dict) else (r["area"] if "area" in r.index else None),
         }
         if "id" in r and pd.notna(r["id"]):
             row["id"] = int(r["id"])
@@ -617,6 +619,31 @@ with tab_graf:
             fig_r.update_layout(height=300, bargap=0.3, xaxis_title="", yaxis_title="")
             wrap(fig_r, "bar_resp")
 
+        # Gráfico: Clientes × Projetos × Área
+        if "area" in dfv.columns and dfv["area"].notna().any():
+            AREA_COLORS = {
+                "Contábil":      "#1A6B7C",
+                "Fiscal":        "#1B2D4F",
+                "DP":            "#2C6E49",
+                "Controladoria": "#F59E0B",
+                "Financeiro":    "#6B87A8",
+                "Tecnologia":    "#C1440E",
+            }
+            df_ca = (dfv.drop_duplicates(subset=["cliente","projeto_macro"])
+                        .groupby(["cliente","area"]).size().reset_index(name="Projetos"))
+            df_ca = df_ca.sort_values(["cliente","Projetos"], ascending=[True, False])
+            fig_ca = px.bar(df_ca, x="Projetos", y="cliente", color="area",
+                            color_discrete_map=AREA_COLORS, barmode="stack",
+                            orientation="h")
+            fig_ca.update_traces(marker_line_width=0)
+            fig_base(fig_ca, "Clientes × Qtd. de Projetos × Área")
+            fig_ca.update_layout(
+                height=max(300, df_ca["cliente"].nunique() * 45),
+                bargap=0.3, xaxis_title="Projetos", yaxis_title="",
+                yaxis=dict(autorange="reversed"),
+            )
+            wrap(fig_ca, "bar_cli_area")
+
         proj_stats = []
         for proj in dfv["projeto_macro"].unique():
             dp     = dfv[dfv["projeto_macro"] == proj]
@@ -693,8 +720,9 @@ if tab_edit is not None:
         df_edit = dfv.copy()
         # Renomear colunas para exibição
         col_map = {
-            "cliente": "Cliente", "projeto_macro": "Projeto Macro", "micro_etapa": "Micro Etapa",
-            "prazo_micro": "Prazo Micro", "responsavel": "Responsável", "status_micro": "Status Micro",
+            "cliente": "Cliente", "projeto_macro": "Projeto Macro", "area": "Área",
+            "micro_etapa": "Micro Etapa", "prazo_micro": "Prazo Micro",
+            "responsavel": "Responsável", "status_micro": "Status Micro",
             "prazo_entrega": "Prazo Entrega", "status_macro": "Status Macro",
         }
         df_show = df_edit.rename(columns=col_map)
@@ -708,9 +736,10 @@ if tab_edit is not None:
                 "id":            st.column_config.NumberColumn("ID",            disabled=True, width="small"),
                 "Cliente":       st.column_config.TextColumn("Cliente",         width="medium"),
                 "Projeto Macro": st.column_config.TextColumn("Projeto Macro",   width="large"),
+                "Área":          st.column_config.SelectboxColumn("Área",       options=AREAS, width="medium"),
                 "Micro Etapa":   st.column_config.TextColumn("Micro Etapa",     width="large"),
                 "Prazo Micro":   st.column_config.DateColumn("Prazo Micro",     format="DD/MM/YYYY", width="small"),
-                "Responsável":   st.column_config.SelectboxColumn("Responsável",options=RESPONSAVEIS+["MARIANA"], width="medium"),
+                "Responsável":   st.column_config.SelectboxColumn("Responsável",options=RESPONSAVEIS, width="medium"),
                 "Status Micro":  st.column_config.SelectboxColumn("Status Micro",options=STATUS_MICRO_OPTS, width="medium"),
                 "Prazo Entrega": st.column_config.DateColumn("Prazo Entrega",   format="DD/MM/YYYY", width="small"),
                 "Status Macro":  st.column_config.SelectboxColumn("Status Macro",options=STATUS_MACRO_OPTS, width="medium"),
@@ -780,23 +809,26 @@ with tab_novo:
             col_np, _ = st.columns([2, 3])
             with col_np:
                 prj_val = st.text_input("Nome do novo projeto", key="nr_prj_text")
-            col_pe, col_sma, _ = st.columns([1, 1, 3])
-            with col_pe:  pe_  = st.date_input("Prazo de Entrega", value=today, key="nr_pe")
-            with col_sma: sma_ = st.selectbox("Status Macro", STATUS_MACRO_OPTS, key="nr_sma")
+            col_area_prj, col_pe, col_sma, _ = st.columns([1, 1, 1, 2])
+            with col_area_prj: area_prj_ = st.selectbox("Área do Projeto", AREAS, key="nr_area_prj")
+            with col_pe:       pe_       = st.date_input("Prazo de Entrega", value=today, key="nr_pe")
+            with col_sma:      sma_      = st.selectbox("Status Macro", STATUS_MACRO_OPTS, key="nr_sma")
         else:
             prj_val = prj_sel
-            # herdar prazo e status do projeto existente
+            # herdar prazo, status e área do projeto existente
             dp_exist = df[df["projeto_macro"] == prj_val] if not df.empty else pd.DataFrame()
             pe_exist = dp_exist["prazo_entrega"].iloc[0] if not dp_exist.empty else None
-            pe_  = pe_exist if pe_exist and not pd.isna(pe_exist) else today
-            sma_ = dp_exist["status_macro"].iloc[0] if not dp_exist.empty else "EM ANDAMENTO"
+            pe_       = pe_exist if pe_exist and not pd.isna(pe_exist) else today
+            sma_      = dp_exist["status_macro"].iloc[0] if not dp_exist.empty else "EM ANDAMENTO"
+            area_prj_ = dp_exist["area"].iloc[0] if not dp_exist.empty and "area" in dp_exist.columns and pd.notna(dp_exist["area"].iloc[0]) else AREAS[0]
 
         # ── Passo 3: Micro Etapa ──────────────────────────────────────────────
         st.markdown('<hr style="border:none;border-top:1px solid #D5D9E0;margin:18px 0 14px">', unsafe_allow_html=True)
         with st.form("form_micro", clear_on_submit=True):
-            c1, c2 = st.columns([3, 1])
-            with c1: micro = st.text_area("Descrição da Micro Etapa", height=80, placeholder="Descreva a etapa...")
-            with c2: resp  = st.selectbox("Responsável", RESPONSAVEIS)
+            c1, c2, c3 = st.columns([3, 1, 1])
+            with c1: micro     = st.text_area("Descrição da Micro Etapa", height=80, placeholder="Descreva a etapa...")
+            with c2: resp      = st.selectbox("Responsável", RESPONSAVEIS)
+            with c3: area_micro = st.selectbox("Área", AREAS)
             cm1, cm2, _ = st.columns([1, 1, 3])
             with cm1: pm_ = st.date_input("Prazo da Micro Etapa", value=today)
             with cm2: sm_ = st.selectbox("Status Micro", STATUS_MICRO_OPTS)
@@ -815,6 +847,7 @@ with tab_novo:
                     "status_micro":  sm_,
                     "prazo_entrega": pe_.strftime("%Y-%m-%d") if hasattr(pe_, "strftime") else str(pe_)[:10],
                     "status_macro":  sma_,
+                    "area":          area_micro,
                 })
                 st.success(f"Etapa adicionada ao projeto **{prj_val}**.")
                 st.rerun()
