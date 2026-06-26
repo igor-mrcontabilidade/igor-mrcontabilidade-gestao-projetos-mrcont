@@ -475,13 +475,24 @@ for col, val, lbl, cor in [
 st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
 # ── Abas ──────────────────────────────────────────────────────────────────────
-abas = ["  📋  Projetos  ", "  📊  Gráficos  ", "  ✏️  Editar  ", "  ➕  Novo Registro  "]
-if st.session_state.role == "master":
+_role = st.session_state.role
+_is_viewer = (_role == "viewer")
+
+abas = ["  📋  Projetos  ", "  📊  Gráficos  "]
+if not _is_viewer:
+    abas += ["  ✏️  Editar  ", "  ➕  Novo Registro  "]
+if _role == "master":
     abas.append("  👥  Usuários  ")
 
-tabs = st.tabs(abas)
-tab_proj, tab_graf, tab_edit, tab_novo = tabs[0], tabs[1], tabs[2], tabs[3]
-tab_users = tabs[4] if st.session_state.role == "master" else None
+tabs     = st.tabs(abas)
+tab_proj = tabs[0]
+tab_graf = tabs[1]
+tab_edit = tabs[2] if not _is_viewer else None
+tab_novo = tabs[3] if not _is_viewer else None
+tab_users = tabs[4] if _role == "master" else (tabs[2] if _role == "master" and _is_viewer else None)
+# recalcular índice correto para master
+if _role == "master":
+    tab_users = tabs[4] if not _is_viewer else tabs[2]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -670,47 +681,48 @@ with tab_graf:
 # ══════════════════════════════════════════════════════════════════════════════
 # ABA 3 — EDITAR
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_edit:
-    st.markdown(
-        f'<div style="background:{C_NÉVOA};border-left:3px solid {C_ACCENT};border-radius:6px;'
-        f'padding:10px 14px;margin-bottom:16px">'
-        f'<p style="font-family:Arial,sans-serif;font-size:13px;color:{C_TITLE};margin:0">'
-        f'Clique duas vezes em qualquer célula para editar. Clique em Salvar para confirmar.</p></div>',
-        unsafe_allow_html=True)
+if tab_edit is not None:
+    with tab_edit:
+            st.markdown(
+            f'<div style="background:{C_NÉVOA};border-left:3px solid {C_ACCENT};border-radius:6px;'
+            f'padding:10px 14px;margin-bottom:16px">'
+            f'<p style="font-family:Arial,sans-serif;font-size:13px;color:{C_TITLE};margin:0">'
+            f'Clique duas vezes em qualquer célula para editar. Clique em Salvar para confirmar.</p></div>',
+            unsafe_allow_html=True)
 
-    df_edit = dfv.copy()
-    # Renomear colunas para exibição
-    col_map = {
-        "cliente": "Cliente", "projeto_macro": "Projeto Macro", "micro_etapa": "Micro Etapa",
-        "prazo_micro": "Prazo Micro", "responsavel": "Responsável", "status_micro": "Status Micro",
-        "prazo_entrega": "Prazo Entrega", "status_macro": "Status Macro",
-    }
-    df_show = df_edit.rename(columns=col_map)
-    cols_show = ["id"] + list(col_map.values())
-    df_show = df_show[[c for c in cols_show if c in df_show.columns]]
+        df_edit = dfv.copy()
+        # Renomear colunas para exibição
+        col_map = {
+            "cliente": "Cliente", "projeto_macro": "Projeto Macro", "micro_etapa": "Micro Etapa",
+            "prazo_micro": "Prazo Micro", "responsavel": "Responsável", "status_micro": "Status Micro",
+            "prazo_entrega": "Prazo Entrega", "status_macro": "Status Macro",
+        }
+        df_show = df_edit.rename(columns=col_map)
+        cols_show = ["id"] + list(col_map.values())
+        df_show = df_show[[c for c in cols_show if c in df_show.columns]]
 
-    edited = st.data_editor(
-        df_show.reset_index(drop=True),
-        use_container_width=True, num_rows="dynamic",
-        column_config={
-            "id":            st.column_config.NumberColumn("ID",            disabled=True, width="small"),
-            "Cliente":       st.column_config.TextColumn("Cliente",         width="medium"),
-            "Projeto Macro": st.column_config.TextColumn("Projeto Macro",   width="large"),
-            "Micro Etapa":   st.column_config.TextColumn("Micro Etapa",     width="large"),
-            "Prazo Micro":   st.column_config.DateColumn("Prazo Micro",     format="DD/MM/YYYY", width="small"),
-            "Responsável":   st.column_config.SelectboxColumn("Responsável",options=RESPONSAVEIS+["MARIANA"], width="medium"),
-            "Status Micro":  st.column_config.SelectboxColumn("Status Micro",options=STATUS_MICRO_OPTS, width="medium"),
-            "Prazo Entrega": st.column_config.DateColumn("Prazo Entrega",   format="DD/MM/YYYY", width="small"),
-            "Status Macro":  st.column_config.SelectboxColumn("Status Macro",options=STATUS_MACRO_OPTS, width="medium"),
-        },
-        hide_index=True, key="editor_main")
+        edited = st.data_editor(
+            df_show.reset_index(drop=True),
+            use_container_width=True, num_rows="dynamic",
+            column_config={
+                "id":            st.column_config.NumberColumn("ID",            disabled=True, width="small"),
+                "Cliente":       st.column_config.TextColumn("Cliente",         width="medium"),
+                "Projeto Macro": st.column_config.TextColumn("Projeto Macro",   width="large"),
+                "Micro Etapa":   st.column_config.TextColumn("Micro Etapa",     width="large"),
+                "Prazo Micro":   st.column_config.DateColumn("Prazo Micro",     format="DD/MM/YYYY", width="small"),
+                "Responsável":   st.column_config.SelectboxColumn("Responsável",options=RESPONSAVEIS+["MARIANA"], width="medium"),
+                "Status Micro":  st.column_config.SelectboxColumn("Status Micro",options=STATUS_MICRO_OPTS, width="medium"),
+                "Prazo Entrega": st.column_config.DateColumn("Prazo Entrega",   format="DD/MM/YYYY", width="small"),
+                "Status Macro":  st.column_config.SelectboxColumn("Status Macro",options=STATUS_MACRO_OPTS, width="medium"),
+            },
+            hide_index=True, key="editor_main")
 
-    if st.button("💾  Salvar alterações", type="primary"):
-        col_back = {v: k for k, v in col_map.items()}
-        df_save  = edited.rename(columns=col_back)
-        upsert_dataframe(df_save)
-        st.success("Salvo com sucesso.")
-        st.rerun()
+        if st.button("💾  Salvar alterações", type="primary"):
+            col_back = {v: k for k, v in col_map.items()}
+            df_save  = edited.rename(columns=col_back)
+            upsert_dataframe(df_save)
+            st.success("Salvo com sucesso.")
+            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -817,13 +829,15 @@ if tab_users is not None:
             f'<p style="font-family:Georgia,serif;font-size:16px;color:{C_TITLE};margin-bottom:20px">Gerenciamento de Usuários</p>',
             unsafe_allow_html=True)
 
+        _ROLE_LABEL = {"master":"Gerente","user":"Colaborador","viewer":"Visualizador"}
         usuarios = list_users()
         if usuarios:
             df_u = pd.DataFrame(usuarios)
             df_u["created_at"] = pd.to_datetime(df_u["created_at"]).dt.strftime("%d/%m/%Y %H:%M")
-        st.dataframe(df_u[["username","nome","role","created_at"]].rename(columns={
-                "username":"Usuário","nome":"Nome","role":"Perfil","created_at":"Criado em"
-            }), use_container_width=True, hide_index=True)
+            df_u["role"] = df_u["role"].map(_ROLE_LABEL).fillna(df_u["role"])
+            st.dataframe(df_u[["username","nome","role","created_at"]].rename(columns={
+                    "username":"Usuário","nome":"Nome","role":"Perfil","created_at":"Criado em"
+                }), use_container_width=True, hide_index=True)
 
         st.divider()
         st.markdown(
@@ -837,7 +851,13 @@ if tab_users is not None:
                 novo_nome     = st.text_input("Nome completo")
             with uc2:
                 novo_pw   = st.text_input("Senha", type="password")
-                novo_role = st.selectbox("Perfil", ["user", "master"])
+                novo_role = st.selectbox("Perfil",
+                    ["user", "viewer", "master"],
+                    format_func=lambda r: {
+                        "user":   "Colaborador — pode editar e criar",
+                        "viewer": "Visualizador — só leitura",
+                        "master": "Gerente — acesso total",
+                    }[r])
             criar = st.form_submit_button("➕  Criar usuário", type="primary")
 
         if criar:
