@@ -590,13 +590,21 @@ with tab_graf:
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False}, key=key)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if dfv.empty:
+    # Filtro de cliente exclusivo da aba Gráficos
+    clientes_graf = ["Todos"] + sorted(dfv["cliente"].unique().tolist()) if not dfv.empty else ["Todos"]
+    gc1, _ = st.columns([2, 5])
+    with gc1:
+        f_cli_graf = st.selectbox("Filtrar por Cliente", clientes_graf, key="graf_cliente")
+    dfg = dfv[dfv["cliente"] == f_cli_graf].copy() if f_cli_graf != "Todos" else dfv.copy()
+
+    if dfg.empty:
         st.info("Nenhum dado para exibir.")
     else:
         g1, g2 = st.columns(2)
         with g1:
-            cnt = dfv["status_micro"].value_counts().reset_index()
+            cnt = dfg["status_micro"].value_counts().reset_index()
             cnt.columns = ["Status", "Qtd"]
+            total_g = len(dfg)
             fig_d = go.Figure(go.Pie(
                 labels=cnt["Status"], values=cnt["Qtd"], hole=0.55,
                 marker=dict(colors=[STATUS_COLOR.get(s, "#6B87A8") for s in cnt["Status"]],
@@ -604,14 +612,14 @@ with tab_graf:
                 textinfo="value+percent",
                 textfont=dict(family="Arial, sans-serif", size=12, color="#FFF"),
             ))
-            fig_d.add_annotation(text=f"<b>{total}</b><br>etapas", x=0.5, y=0.5, showarrow=False,
+            fig_d.add_annotation(text=f"<b>{total_g}</b><br>etapas", x=0.5, y=0.5, showarrow=False,
                                   font=dict(family="Georgia, serif", size=14, color=C_TITLE))
             fig_base(fig_d, "Distribuição por Status")
             fig_d.update_layout(height=300)
             wrap(fig_d, "donut")
 
         with g2:
-            cnt_r = dfv.groupby(["responsavel", "status_micro"]).size().reset_index(name="Qtd")
+            cnt_r = dfg.groupby(["responsavel", "status_micro"]).size().reset_index(name="Qtd")
             fig_r = px.bar(cnt_r, x="responsavel", y="Qtd", color="status_micro",
                            color_discrete_map=STATUS_COLOR, barmode="stack")
             fig_r.update_traces(marker_line_width=0)
@@ -620,7 +628,7 @@ with tab_graf:
             wrap(fig_r, "bar_resp")
 
         # Gráfico: Clientes × Projetos × Área
-        if "area" in dfv.columns and dfv["area"].notna().any():
+        if "area" in dfg.columns and dfg["area"].notna().any():
             AREA_COLORS = {
                 "Contábil":      "#1A6B7C",
                 "Fiscal":        "#1B2D4F",
@@ -629,7 +637,7 @@ with tab_graf:
                 "Financeiro":    "#6B87A8",
                 "Tecnologia":    "#C1440E",
             }
-            df_ca = (dfv.drop_duplicates(subset=["cliente","projeto_macro"])
+            df_ca = (dfg.drop_duplicates(subset=["cliente","projeto_macro"])
                         .groupby(["cliente","area"]).size().reset_index(name="Projetos"))
             df_ca = df_ca.sort_values(["cliente","Projetos"], ascending=[True, False])
             fig_ca = px.bar(df_ca, x="Projetos", y="cliente", color="area",
@@ -645,8 +653,8 @@ with tab_graf:
             wrap(fig_ca, "bar_cli_area")
 
         proj_stats = []
-        for proj in dfv["projeto_macro"].unique():
-            dp     = dfv[dfv["projeto_macro"] == proj]
+        for proj in dfg["projeto_macro"].unique():
+            dp     = dfg[dfg["projeto_macro"] == proj]
             tp     = len(dp)
             conc   = int((dp["status_micro"] == "CONCLUÍDO").sum())
             and_p  = int((dp["status_micro"] == "EM ANDAMENTO").sum())
@@ -673,8 +681,8 @@ with tab_graf:
         wrap(fig_p, "bar_proj")
 
         gantt = []
-        for proj in dfv["projeto_macro"].unique():
-            dp = dfv[dfv["projeto_macro"] == proj].dropna(subset=["prazo_micro"])
+        for proj in dfg["projeto_macro"].unique():
+            dp = dfg[dfg["projeto_macro"] == proj].dropna(subset=["prazo_micro"])
             if dp.empty: continue
             gantt.append(dict(Task=proj, Start=dp["prazo_micro"].min(),
                               Finish=dp["prazo_entrega"].max() if not dp["prazo_entrega"].isna().all() else dp["prazo_micro"].max(),
