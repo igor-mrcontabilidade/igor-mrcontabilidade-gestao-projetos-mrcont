@@ -501,11 +501,18 @@ if _role == "master":
 # ABA 1 — PROJETOS
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_proj:
-    if dfv.empty:
+    # Filtro de cliente interno da aba Projetos
+    clientes_proj = ["Todos"] + sorted(dfv["cliente"].unique().tolist()) if not dfv.empty else ["Todos"]
+    pc1, _ = st.columns([2, 5])
+    with pc1:
+        f_cli_proj = st.selectbox("Filtrar por Cliente", clientes_proj, key="proj_cliente")
+    dfp = dfv[dfv["cliente"] == f_cli_proj].copy() if f_cli_proj != "Todos" else dfv.copy()
+
+    if dfp.empty:
         st.info("Nenhuma etapa encontrada para os filtros selecionados.")
     else:
-        for cliente in dfv["cliente"].unique():
-            df_cli = dfv[dfv["cliente"] == cliente].copy()
+        for cliente in dfp["cliente"].unique():
+            df_cli = dfp[dfp["cliente"] == cliente].copy()
             html_cli = (
                 f'<p style="font-family:Arial,sans-serif;font-size:10px;color:{C_ACCENT};'
                 f'letter-spacing:2px;text-transform:uppercase;margin:0 0 4px 0">CLIENTE</p>'
