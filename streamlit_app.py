@@ -683,7 +683,7 @@ with tab_graf:
 # ══════════════════════════════════════════════════════════════════════════════
 if tab_edit is not None:
     with tab_edit:
-            st.markdown(
+        st.markdown(
             f'<div style="background:{C_NÉVOA};border-left:3px solid {C_ACCENT};border-radius:6px;'
             f'padding:10px 14px;margin-bottom:16px">'
             f'<p style="font-family:Arial,sans-serif;font-size:13px;color:{C_TITLE};margin:0">'
